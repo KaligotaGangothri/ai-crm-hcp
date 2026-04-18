@@ -82,14 +82,18 @@ function App() {
           { 
             role: "assistant", 
             type: "success", 
-            text: "✅ Interaction logged successfully! The details (HCP Name, Date, Sentiment, and Materials) have been automatically populated based on your summary. Would you like me to suggest a specific follow-up action, such as scheduling a meeting?" 
+            text: "✅ Interaction logged successfully! The details have been automatically populated. Would you like me to suggest a specific follow-up action?" 
           }
         ]);
-      } else if (response.data && response.data.output) {
-        // Handle general chat response
+      } else {
+        // Handle general chat response (could be text or a tool object)
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", type: "chat", text: response.data.output }
+          { 
+            role: "assistant", 
+            type: "chat", 
+            text: response.data.output || response.data 
+          }
         ]);
       }
     } catch (error) {
@@ -210,7 +214,10 @@ function App() {
 
             return (
               <Box key={idx} sx={{ background: bgColor, p: 2, borderRadius: 2, borderLeft: borderLeft, fontSize: 14, color: textColor, lineHeight: 1.5, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-                {msg.text}
+                {/* --- FIX: Safe Rendering of Objects --- */}
+                {typeof msg.text === 'object' 
+                  ? (msg.text.data || msg.text.output || JSON.stringify(msg.text)) 
+                  : msg.text}
               </Box>
             );
           })}
