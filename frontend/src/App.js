@@ -43,7 +43,7 @@ function App() {
     {
       role: "assistant",
       type: "info",
-      text: "Log interaction details here (e.g., \"Met Dr. Smith, discussed Product X efficacy, positive sentiment, shared brochure\") or ask for help."
+      text: "Log interaction details here (e.g., \"Met Dr. Smith, on 20-04-2026 at 11:11, Rahul and Akshay, discussed Product X efficacy, positive sentiment, shared brochure\") or ask for help."
     }
   ]);
 
@@ -72,9 +72,35 @@ function App() {
     try {
       const response = await axios.post(`${API}/ai-chat`, { message: userMessage });
       
-      // Update form if AI extracted structured data
-      if (response.data && response.data.doctor_name) {
-        setForm((prevForm) => ({ ...prevForm, ...response.data }));
+      // 1. Safely extract the payload (handles if backend nests it inside 'data' or 'output')
+      const aiData = response.data.data || response.data.output || response.data;
+      
+      // 2. Look for the doctor's name to confirm it's an extraction event
+      const extractedDoctorName = aiData.doctor_name || aiData.hcp_name;
+
+      if (extractedDoctorName) {
+        
+        // --- CLEANUP LOGIC FOR INTERACTION TYPE ---
+        let rawType = aiData.interaction_type || "Meeting";
+        let cleanType = rawType.charAt(0).toUpperCase() + rawType.slice(1).toLowerCase();
+        
+        // Ensure it exactly matches the Material UI Dropdown options
+        if (!["Meeting", "Call", "Email"].includes(cleanType)) {
+            cleanType = "Meeting";
+        }
+        // ------------------------------------------
+
+        // 3. EXPLICITLY map the backend keys to your frontend form state
+        setForm((prevForm) => ({
+          ...prevForm,
+          doctor_name: extractedDoctorName,
+          interaction_type: cleanType, // Use the cleaned variable here!
+          date: aiData.date || prevForm.date,
+          time: aiData.time || prevForm.time,
+          attendees: aiData.attendees || aiData.representatives_present || prevForm.attendees,
+          topics: aiData.topics || aiData.topics_discussed || prevForm.topics,
+          sentiment: aiData.sentiment ? aiData.sentiment.toLowerCase() : "neutral"
+        }));
         
         // Add AI Success bubble to the UI
         setMessages((prev) => [
@@ -82,7 +108,7 @@ function App() {
           { 
             role: "assistant", 
             type: "success", 
-            text: "✅ Interaction logged successfully! The details have been automatically populated. Would you like me to suggest a specific follow-up action?" 
+            text: "✅ Interaction logged successfully! The details have been automatically populated." 
           }
         ]);
       } else {
@@ -214,7 +240,6 @@ function App() {
 
             return (
               <Box key={idx} sx={{ background: bgColor, p: 2, borderRadius: 2, borderLeft: borderLeft, fontSize: 14, color: textColor, lineHeight: 1.5, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-                {/* --- FIX: Safe Rendering of Objects --- */}
                 {typeof msg.text === 'object' 
                   ? (msg.text.data || msg.text.output || JSON.stringify(msg.text)) 
                   : msg.text}
